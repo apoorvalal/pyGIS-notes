@@ -9,6 +9,7 @@ output:
     transition: slide
     center : true
     highlight : zenburn
+    css: reveal.css
     reveal_options:
       slideNumber: true
       center : true
@@ -17,18 +18,6 @@ output:
       width: 110%
 bibliography: cites.bib
 ---
-<style type="text/css">
-  .reveal p {
-    text-align: left;
-    font-size: 0.9em !important;
-  }
-  .reveal ul {
-    display: block;
-  }
-  .reveal ol {
-    display: block;
-  }
-</style>
 
 ```{r setup, include=FALSE}
 library(LalRUtils)
@@ -50,10 +39,11 @@ opts_chunk$set(cache=TRUE, warning = FALSE)
   - **inferential challenges**
     - SUTVA (Stable Unit Treatment Value Assumption) violations
     - Correlated unobservables (and thus standard errors) [@Kelly2019-zs]
-  - but also **research design opportunities** (@kudamatsu2018gis, @donaldson2016view for overview)
-    - spatial merges that allow for richer set of controls (weather, rainfall, topography etc)
+  - **research design opportunities** (@kudamatsu2018gis, @donaldson2016view for overview)
+    - spatial merges that allow for richer set of controls (weather, rainfall, topography etc) [@dell2014we]
     - use of administrative boundaries as source of variation (geographical regression discontinuity designs)
-    - use of remote sensing data (e.g. nightlights, LANDSAT)
+      - including digitisation of historical maps (e.g. dozens of papers written based on Murdock atlas digitized by Nunn)
+    - use of remote sensing data (e.g. nightlights, LANDSAT, PM2.5)
 
 # The Geospatial analysis toolkit
 
@@ -62,26 +52,37 @@ opts_chunk$set(cache=TRUE, warning = FALSE)
 ### Proprietary tools
 - ArcGIS (~ Excel of GIS)
   + Pros: GUI, good documentation, technical consulting has you covered
-  + Cons: GUI, \$\$\$, non-automatable
+  + Cons: GUI, \$\$\$, non-automatable (though python scripting option exists)
+  + Windows Only
 
 ### Open-Source Tools
 - QGIS (~ OpenOffice of GIS)
   + Pros: All of the above + Free
   + Cons: GUI
+  + [guide](https://www.osgeo.org/resources/)
 
 - Python / R Spatial Ecosystem
   + Pros: Free, automatable, rapidly developed
-  + Cons: Steep(er) Learning Curve
+  + Cons: Steep(er) Learning Curve, codebases can be moving targets
+
+**Open science should, as far as possible, use FOSS tools**
 
 ## Aside on automation
 
-- Computational social science workflows involve a number of judgement calls in data input/coding, analysis, numerous robustness checks
+- Empirical social science workflows involve a number of judgement
+  calls in data input/coding, analysis, numerous robustness checks
 - This means your data prep/analysis pipeline should be as streamlined
   as possible to accommodate suggested changes / robustness checks
   from colleagues, referees, advisors
-- Future you will thank you for putting in the extra effort so you don't have to click through 20 menus in GIS for a robustness check
+- Future you will thank you for putting in the extra effort so you
+  don't have to click through 20 menus in GIS for a robustness check
+- However, don't go overboard; "Premature optimization is the root of
+  all evil" - Don Knuth
+  - use notebooks / scripts, but clean namespaces
 
-For a more thorough case for automation and tips to get started, see @Gentzkow2014-wp, @healy2016plain
+For a more thorough case for automation and tips to get started, see
+@Gentzkow2014-wp, @healy2016plain
+
 
 ## This Talk
 
@@ -91,8 +92,9 @@ toolkit *in Python* based on my own trial-and-error learning,
 
 Major packages:
 
-- `geopandas` - geospatial analysis tools built on top of widely used pandas library
-- `rasterio` - interface with Raster Data
+- `geopandas` - geospatial analysis tools built on top of widely used
+  `pandas` library
+- `rasterio/georasters` - interface with raster data
 - `pysal` - spatial econometrics (and much more)
 - `rasterstats` - summary statistics of raster datasets for vector features
 
@@ -100,7 +102,8 @@ Major packages:
 
 ## Equivalent tools available in R
 
-- `sf` (stands for Simple Features) for general spatial data needs + spatial interface with tidyverse data structures
+- `sf` (stands for Simple Features) for general spatial data needs +
+  spatial interface with tidyverse data structures
 - `stars` (spatiotemporal tidy arrays) for vector data
 - `tidync` for NetCDF files
 
@@ -110,20 +113,17 @@ See @lovelace2019geocomputation for overview
 
 [code.earthengine.google.com](Google Earth Engine)
 
-![Earth Engine Interface](figs/earthEngine.png)
+<img src="figs/earthEngine.png" width="200" height="00"/>
 
 # Spatial Data Overview
 
-## Data Structures
-
-## Vectors
+## Data Structures - vectors
 
 Essentially a dataframe with spatial features attached as an extra (potentially quite complicated) column
 
   + point (lat, long) - spatial column is simple
   + polygon (administrative units) - spatial column indexes every vertex
-  + line (river, road etc) - "
-
+  + line (river, road etc) - spatial column indexes every vertex
 
 Typically stored as shapefiles (`.shp + .prj + .shx + dbf`), or `.geojson` files
 
@@ -133,7 +133,7 @@ Start with good habits - [Use GPKG/GeoJSON](http://switchfromshapefile.org/)
 
 ![land boundaries](figs/land_boundaries.png)
 
-## Rasters
+## Data Structures - Rasters
 
 Matrices $$R := [R_{ij}]$$ of size $m \times n$ holds numerical
 information (e.g. luminosity)
@@ -143,14 +143,50 @@ information (e.g. luminosity)
 + Single band - only 1 value measured for each cell (e.g. luminosity in nightlights)
 + Multiband - multiple values for each cell (e.g. RGB + Infrared in LANDSAT)
 
+typically stored as `.tif` (i.e. it is just an image)
+
 ## Example - Hansen Deforestation data
 
 ![Deforestation data raster](figs/deforestation_raster.png)
 
+## Example - DMSP Night Lights 2012
+
+![](figs/dmsp_clip_2000.png)
+
 ## Misc
 
-+ **TIN** - [Three dimensional terrain data](http://desktop.arcgis.com/en/arcmap/10.3/manage-data/tin/fundamentals-of-tin-surfaces.htm)
-+ **netCDF** - [plaintext array storage](https://pro.arcgis.com/en/pro-app/help/data/multidimensional/what-is-netcdf-data.htm) that is often used instead of rasters [equivalent to raster if you know position of top left coordinate and resolution]
++ **TIN** - [Three dimensional terrain
+  data](http://desktop.arcgis.com/en/arcmap/10.3/manage-data/tin/fundamentals-of-tin-surfaces.htm)
+
++ **netCDF** - [plaintext array
+  storage](https://pro.arcgis.com/en/pro-app/help/data/multidimensional/what-is-netcdf-data.htm)
+  that is often used instead of rasters [equivalent to raster if you
+  know position of top left coordinate and resolution]
+
+# Geospatial Operations
+
+##
+
+### Visualisation
++ (Choropleth) Maps are great ways to convey spatial information
++ Everyone understands them
++ Caveat: often sensitive to binning
+
+### Spatial merges / Spatial joins
++ subsetting
++ polygon-point join (merging cities with countries)
++ polygon-polygon join (merging villages with constituencies)
+
+---
+
+### Distance Computation
++ Haversine (great circle) distance between points and line (e.g.
+  distance to coastline in @nunn2008long)
++ Distances from important boundary for regression discontinuity
+
+### Buffers
++ Construct region in proximity to point/line
+  * @bazzi2017frontier construct frontier from proximity to boundary at which population density dropped below 2 per square mile
 
 # The Python Spatial Ecosystem
 
@@ -164,7 +200,6 @@ Use separate `conda` environment for spatial work (or `virtualenv`) - **especial
 Use a modern notebook environment for interactive programming
 (difficult to do spatial work without seeing what you're doing)
 
-
 ![jupyter lab](figs/jplb.png)
 
 ## GeoPandas
@@ -175,6 +210,8 @@ set of tools for geospatial data management / merging/ plotting
 + main data structures
   * `geoseries` (geospatial analogue to Pandas `series`)
   * `GeoDataFrame` (geospatial analogue to Pandas `DataFrame`)
++ performs distance, area computations
++ Handy set of plot functions built on top of matplotlib, extended by `geoplot`
 
 [Homepage](http://geopandas.org/)
 
@@ -183,7 +220,6 @@ set of tools for geospatial data management / merging/ plotting
 + [`Georasters`](https://github.com/ozak/georasters) aims to be GeoPandas-like workhorse library for Rasters.
 + [`rasterio`](https://rasterio.readthedocs.io/en/stable/quickstart.html) Raster Input and Output - clunkier, but plays nicely with `numpy`
 + [`rasterstats`](https://pythonhosted.org/rasterstats/) summarises geospatial rasters based on vector geometries (e.g. calculating mean PM 2.5 levels by province in China)
-
 
 ## PySAL
 
@@ -203,5 +239,15 @@ set of tools for geospatial data management / merging/ plotting
 
 - [Earth Data Science Tutorials](https://www.earthdatascience.org/tags/spatial-data-and-gis/)
 - [Automating GIS Processes - University of Helsinki](https://automating-gis-processes.github.io/site/master/index.html)
+- [QGIS Documentation](https://docs.qgis.org/3.4/en/docs/)
+- [Geospatial Analysis Open Access Book](http://www.spatialanalysisonline.com/HTML/index.html)
+- [Historical GIS](http://www.hgis.org.uk/resources.htm)
+- [AidData GeoQuery](https://www.aiddata.org/geoquery)
+
+# Thanks!
+
+##
+
+[apoorval@stanford.edu](mailto:apoorval@stanford.edu)
 
 ---
