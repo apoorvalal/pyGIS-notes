@@ -1,11 +1,23 @@
-#!/usr/bin/env python
-# coding: utf-8
+# -*- coding: utf-8 -*-
+# ---
+# jupyter:
+#   jupytext:
+#     formats: ipynb,py:hydrogen
+#     text_representation:
+#       extension: .py
+#       format_name: hydrogen
+#       format_version: '1.3'
+#       jupytext_version: 1.3.1
+#   kernelspec:
+#     display_name: gis
+#     language: python
+#     name: gds
+# ---
 
+# %% [markdown] Collapsed="false"
 # # Introduction to Spatial Data Analysis in Python 
 
-# In[1]:
-
-
+# %% Collapsed="false"
 import os, sys, glob
 from pathlib import Path
 import numpy as np
@@ -19,6 +31,7 @@ import geopandas as gpd
 import geoplot as gplt
 import mapclassify as mc
 import geoplot.crs as gcrs
+from earthpy import clip as cl
 
 # raster packages
 import rasterio as rio
@@ -35,98 +48,87 @@ from pysal.lib.weights.weights import W
 from IPython.core.interactiveshell import InteractiveShell
 InteractiveShell.ast_node_interactivity = 'all'
 
-
+# %% [markdown] Collapsed="false"
 # # Vector data 
 
+# %% [markdown] Collapsed="false"
 # From [Natural Earth](https://www.naturalearthdata.com/http//www.naturalearthdata.com/download/110m/cultural/110m_cultural.zip)
 
-# In[2]:
-
-
+# %% Collapsed="false"
 cities = gpd.read_file("https://www.naturalearthdata.com/http//www.naturalearthdata.com/download/110m/cultural/ne_110m_populated_places.zip")
 
-
-# In[3]:
-
-
+# %% Collapsed="false"
 countries = gpd.read_file('https://www.naturalearthdata.com/http//www.naturalearthdata.com/download/10m/cultural/ne_10m_admin_0_countries.zip')
 
-
-# In[4]:
-
-
+# %% Collapsed="false"
 countries.head()
 
-
-# In[5]:
-
-
+# %% Collapsed="false"
 cities.head()
 
+# %% [markdown] Collapsed="false"
+# ## Constructing Geodataframe from lon-lat 
 
+# %% Collapsed="false"
+df = pd.DataFrame({'City': ['Buenos Aires', 'Brasilia', 'Santiago', 'Bogota', 'Caracas'],
+     'Country': ['Argentina', 'Brazil', 'Chile', 'Colombia', 'Venezuela'],
+     'Latitude': [-34.58, -15.78, -33.45, 4.60, 10.48],
+     'Longitude': [-58.66, -47.91, -70.66, -74.08, -66.86]})
+lat_am_capitals = gpd.GeoDataFrame(df, geometry = gpd.points_from_xy(df.Longitude, df.Latitude))
+
+# %% [markdown] Collapsed="false"
 # ## Making Maps
 
-# In[6]:
-
-
+# %% Collapsed="false"
 f, ax = plt.subplots(dpi = 200)
 countries.plot(edgecolor = 'k', facecolor = 'None', linewidth = 0.6, ax = ax)
 cities.plot(markersize = 0.5, facecolor = 'red', ax = ax)
+lat_am_capitals.plot(markersize = 0.5, facecolor = 'y', ax = ax)
 ax.set_title('World Map')
 ax.set_axis_off()
 
-
+# %% [markdown] Collapsed="false"
 # ## Static Webmaps
 
-# In[39]:
-
-
+# %% Collapsed="false"
 ax = gplt.webmap(countries, projection=gplt.crs.WebMercator(), figsize = (16, 12))
 gplt.pointplot(cities, ax=ax, hue = 'POP2015')
 
-
+# %% [markdown] Collapsed="false"
 # ## Aside on Projections
 
+# %% [markdown] Collapsed="false"
 # Map projections flatten a globe's surface onto a 2D plane. This necessarily distorts the surface (one of Gauss' lesser known results), so one must choose specific form of 'acceptable' distortion.
-# 
+#
 # By convention, the standard projection in GIS is World Geodesic System(lat/lon - `WGS84`). This is a cylindrical projection, which stretches distances east-west and *results in incorrect distance and areal calculations*. For accurate distance and area calculations, try to use UTM (which divides map into zones). See [epsg.io](epsg.io)
 
-# In[8]:
-
-
+# %% Collapsed="false"
 countries.crs
 
-
-# In[9]:
-
-
+# %% Collapsed="false"
 countries_2 = countries.copy()
 countries_2 = countries_2.to_crs({'init': 'epsg:3035'})
 
-
-# In[10]:
-
-
+# %% Collapsed="false"
 f, ax = plt.subplots(dpi = 200)
 countries_2.plot(edgecolor = 'k', facecolor = 'None', linewidth = 0.6, ax = ax)
 ax.set_title('World Map - \n Lambert Azimuthal Equal Area')
 ax.set_axis_off()
 
-
+# %% [markdown] Collapsed="false"
 # ## Choropleths
 
+# %% [markdown] Collapsed="false"
 # Maps with color-coding based on value in table
-# 
+#
 # + scheme=None—A continuous colormap.
 # + scheme=”Quantiles”—Bins the data such that the bins contain equal numbers of samples.
 # + scheme=”EqualInterval”—Bins the data such that bins are of equal length.
 # + scheme=”FisherJenks”—Bins the data using the Fisher natural breaks optimization procedure.
-# 
+#
 # (Example from geoplots gallery)
 
-# In[11]:
-
-
+# %% Collapsed="false"
 cali = gpd.read_file(gplt.datasets.get_path('california_congressional_districts'))
 cali['area'] =cali.geometry.area
 
@@ -159,49 +161,65 @@ axarr[1][1].set_title('scheme="FisherJenks"', fontsize=18)
 plt.subplots_adjust(top=0.92)
 plt.suptitle('California State Districts by Area, 2010', fontsize=18)
 
-
+# %% [markdown] Collapsed="false"
 # ## Spatial Merge
 
+# %% [markdown] Collapsed="false"
 # Subset to Africa
 
-# In[12]:
-
-
+# %% Collapsed="false"
 afr = countries.loc[countries.CONTINENT == 'Africa']
+afr.plot()
 
-
+# %% [markdown] Collapsed="false"
 # Subset cities by merging with African boundaries
 
-# In[13]:
-
-
+# %% Collapsed="false"
 afr_cities = gpd.sjoin(cities, afr, how='inner')
 
-
-# In[38]:
-
-
+# %% Collapsed="false"
 ax = gplt.webmap(afr, projection=gplt.crs.WebMercator(), figsize = (10, 14))
 gplt.pointplot(afr_cities, ax=ax, hue = 'NAME_EN')
 
-
-# In[36]:
-
-
+# %% Collapsed="false"
 afr_cities.head()
 
+# %% [markdown] Collapsed="false"
+# ## Distance Calculations
 
+# %% Collapsed="false"
+rivers = gpd.read_file('https://www.naturalearthdata.com/http//www.naturalearthdata.com/download/50m/physical/ne_50m_rivers_lake_centerlines.zip')
+
+# %% Collapsed="false"
+rivers.geometry.head()
+
+# %% Collapsed="false"
+rivers.plot()
+
+
+# %% Collapsed="false"
+def min_distance(point, lines = rivers):
+    return lines.distance(point).min()
+
+afr_cities['min_dist_to_rivers'] = afr_cities.geometry.apply(min_distance)
+
+# %% Collapsed="false"
+f, ax = plt.subplots(dpi = 200)
+afr.plot(edgecolor = 'k', facecolor = 'None', linewidth = 0.6, ax = ax)
+rivers.plot(ax = ax, linewidth = 0.5)
+afr_cities.plot(column = 'min_dist_to_rivers', markersize = 0.9, ax = ax)
+ax.set_ylim(-35, 50)
+ax.set_xlim(-20, 55)
+ax.set_title('Cities by shortest distance to Rivers')
+ax.set_axis_off()
+
+# %% [markdown] Collapsed="false"
 # ## Buffers
 
-# In[15]:
-
-
+# %% Collapsed="false"
 afr_cities_buf = afr_cities.buffer(1)
 
-
-# In[16]:
-
-
+# %% Collapsed="false"
 f, ax = plt.subplots(dpi = 200)
 afr.plot(facecolor = 'None', edgecolor = 'k', linewidth = 0.1, ax = ax)
 afr_cities_buf.plot(ax=ax, linewidth=0)
@@ -209,74 +227,50 @@ afr_cities.plot(ax=ax, markersize=.2, color='yellow')
 ax.set_title('1 decimal degree buffer \n Major cities in Africa', fontsize = 12)
 ax.set_axis_off()
 
-
+# %% [markdown] Collapsed="false"
 # # Raster Data 
 
-# In[17]:
-
-
+# %% Collapsed="false"
 raster = 'data/res03_crav6190h_sihr_cer.tif'
 
-
-# In[18]:
-
-
+# %% Collapsed="false"
 # Get info on raster
 NDV, xsize, ysize, GeoT, Projection, DataType = gr.get_geo_info(raster)
 
 grow = gr.load_tiff(raster)
 grow = gr.GeoRaster(grow, GeoT, projection = Projection)
 
-
-# In[19]:
-
-
+# %% Collapsed="false"
 f, ax = plt.subplots(1, figsize=(13, 11))
 grow.plot(ax = ax, cmap = 'YlGn_r')
 ax.set_title('GAEZ Crop Suitability Measures')
 ax.set_axis_off()
 
-
+# %% [markdown] Collapsed="false"
 # ## Clipping Raster 
 
-# In[20]:
-
-
+# %% Collapsed="false"
 brazil = countries.query('ADMIN == "Brazil"')
 
-
-# In[21]:
-
-
+# %% Collapsed="false"
 grow_clip = grow.clip(brazil)[0]
 
-
-# In[22]:
-
-
+# %% Collapsed="false"
 f, ax = plt.subplots(1, figsize=(13, 11))
 grow_clip.plot(ax = ax, cmap = 'YlGn_r')
 ax.set_title('GAEZ Crop Suitability Measures')
 ax.set_axis_off()
 
-
+# %% [markdown] Collapsed="false"
 # ## Zonal Statistics 
 
-# In[23]:
-
-
+# %% Collapsed="false"
 murdock = gpd.read_file('https://scholar.harvard.edu/files/nunn/files/murdock_shapefile.zip')
 
-
-# In[24]:
-
-
+# %% Collapsed="false"
 murdock_cs = gpd.GeoDataFrame.from_features((zonal_stats(murdock, raster, geojson_out = True)))
 
-
-# In[25]:
-
-
+# %% Collapsed="false"
 f, ax = plt.subplots(dpi = 300)
 gplt.choropleth(
     murdock_cs, hue='mean', linewidth=.5, cmap='YlGn_r', ax=ax
@@ -284,84 +278,60 @@ gplt.choropleth(
 ax.set_title('Crop Suitability by Homeland \n Murdock Atlas', fontsize = 12)
 
 
+# %% [markdown] Collapsed="false"
 # # Spatial Econometrics 
 
+# %% [markdown] Collapsed="false"
 # ## Weight Matrices
 
-# In[26]:
+# %% Collapsed="false"
+%time w = lps.weights.Queen.from_dataframe(murdock_cs)
 
-
-get_ipython().run_line_magic('time', 'w = lps.weights.Queen.from_dataframe(murdock_cs)')
-
-
-# In[27]:
-
-
+# %% Collapsed="false"
 w.n
 w.mean_neighbors
 
-
-# In[28]:
-
-
+# %% Collapsed="false"
 ax = murdock_cs.plot(color='k', figsize=(9, 9))
 murdock_cs.loc[w.islands, :].plot(color='red', ax=ax);
 
-
-# In[29]:
-
-
+# %% Collapsed="false"
 mur = murdock_cs.drop(w.islands)
 
-
-# In[30]:
-
-
-get_ipython().run_line_magic('time', 'w = lps.weights.Queen.from_dataframe(mur)')
+# %% Collapsed="false"
+%time w = lps.weights.Queen.from_dataframe(mur)
 w.transform = 'r'
 
-
+# %% [markdown] Collapsed="false"
 # ### Moran's I
 
+# %% [markdown] Collapsed="false"
 # Measure of spatial correlation
-# 
+#
 # $$I = \frac{N}{W} \frac{\sum_i \sum_j w_{ij} (x_i - \bar{x} ) ( x_j - \bar{x} ) }{ \sum_i (x_i - \bar{x})^2 }$$
-# 
+#
 # where $N$ is the total number of units, $x$ is the variable of interest, $w_{ij}$ is the spatial weight between units $i$ and $j$, and $W$ is the sum of all weights $w_{ij}$
-# 
+#
 # $I \in [-1, 1]$. Under null of no spatial correlation, $E(I) = \frac{-1}{N-1} \rightarrow 0$ with large $N$. 
 
-# In[31]:
-
-
+# %% Collapsed="false"
 mur.shape
 
-
-# In[32]:
-
-
+# %% Collapsed="false"
 mi = esda.moran.Moran(mur['mean'], w)
 mi.I
 mi.p_sim
 
-
+# %% [markdown] Collapsed="false"
 # ## Spatial Lag
 
-# In[33]:
-
-
+# %% Collapsed="false"
 mur['cs'] = (mur['mean'] - mur['mean'].mean()) / mur['mean'].std()
 
-
-# In[34]:
-
-
+# %% Collapsed="false"
 mur['lag_cs'] = lps.weights.lag_spatial(w, mur['cs'])
 
-
-# In[35]:
-
-
+# %% Collapsed="false"
 f, ax = plt.subplots(1, figsize=(9, 9))
 # Plot values
 sns.regplot(x='cs', y='lag_cs', data=mur, ci=None)
@@ -375,3 +345,10 @@ plt.text(-1.0, -1.5, "LL", fontsize=25)
 # Display
 plt.show()
 
+# %% [markdown] Collapsed="false"
+# # More 
+
+# %% [markdown] Collapsed="false"
+# + Local Indicators of Spatial Autocorrelation (spatial clustering)
+# + Conley SEs
+# + Gaussian Random Fields
