@@ -1,17 +1,16 @@
-# -*- coding: utf-8 -*-
 # ---
 # jupyter:
 #   jupytext:
-#     formats: ipynb,py:hydrogen
+#     formats: ipynb,py:percent
 #     text_representation:
 #       extension: .py
-#       format_name: hydrogen
+#       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.3.1
+#       jupytext_version: 1.13.8
 #   kernelspec:
-#     display_name: gis
+#     display_name: Geo
 #     language: python
-#     name: gds
+#     name: geo_env
 # ---
 
 # %% [markdown] Collapsed="false"
@@ -23,9 +22,9 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import seaborn as sns
-
 import matplotlib.pyplot as plt
 
+# %% Collapsed="false"
 # vector / visualisation packages
 import geopandas as gpd
 import geoplot as gplt
@@ -42,11 +41,8 @@ from rasterstats import zonal_stats
 import pysal as ps
 import esda
 import libpysal as lps
-from pysal.lib.weights.weights import W
 
-
-from IPython.core.interactiveshell import InteractiveShell
-InteractiveShell.ast_node_interactivity = 'all'
+from libpysal.weights import Queen, Rook, KNN
 
 # %% [markdown] Collapsed="false"
 # # Vector data 
@@ -55,10 +51,10 @@ InteractiveShell.ast_node_interactivity = 'all'
 # From [Natural Earth](https://www.naturalearthdata.com/http//www.naturalearthdata.com/download/110m/cultural/110m_cultural.zip)
 
 # %% Collapsed="false"
-cities = gpd.read_file("https://www.naturalearthdata.com/http//www.naturalearthdata.com/download/110m/cultural/ne_110m_populated_places.zip")
+cities = gpd.read_file("data/ne_110m_populated_places.zip")
 
 # %% Collapsed="false"
-countries = gpd.read_file('https://www.naturalearthdata.com/http//www.naturalearthdata.com/download/10m/cultural/ne_10m_admin_0_countries.zip')
+countries = gpd.read_file('data/ne_110m_admin_0_countries.zip')
 
 # %% Collapsed="false"
 countries.head()
@@ -95,7 +91,7 @@ ax = gplt.webmap(countries, projection=gplt.crs.WebMercator(), figsize = (16, 12
 gplt.pointplot(cities, ax=ax, hue = 'POP2015')
 
 # %% [markdown] Collapsed="false"
-# ## Aside on Projections
+# ## Projections
 
 # %% [markdown] Collapsed="false"
 # Map projections flatten a globe's surface onto a 2D plane. This necessarily distorts the surface (one of Gauss' lesser known results), so one must choose specific form of 'acceptable' distortion.
@@ -178,17 +174,13 @@ afr.plot()
 afr_cities = gpd.sjoin(cities, afr, how='inner')
 
 # %% Collapsed="false"
-ax = gplt.webmap(afr, projection=gplt.crs.WebMercator(), figsize = (10, 14))
-gplt.pointplot(afr_cities, ax=ax, hue = 'NAME_EN')
-
-# %% Collapsed="false"
 afr_cities.head()
 
 # %% [markdown] Collapsed="false"
 # ## Distance Calculations
 
 # %% Collapsed="false"
-rivers = gpd.read_file('https://www.naturalearthdata.com/http//www.naturalearthdata.com/download/50m/physical/ne_50m_rivers_lake_centerlines.zip')
+rivers = gpd.read_file('data/ne_110m_rivers_lake_centerlines.zip')
 
 # %% Collapsed="false"
 rivers.geometry.head()
@@ -197,7 +189,7 @@ rivers.geometry.head()
 rivers.plot()
 
 
-# %% Collapsed="false"
+# %% Collapsed="false" tags=[]
 def min_distance(point, lines = rivers):
     return lines.distance(point).min()
 
@@ -207,7 +199,7 @@ afr_cities['min_dist_to_rivers'] = afr_cities.geometry.apply(min_distance)
 f, ax = plt.subplots(dpi = 200)
 afr.plot(edgecolor = 'k', facecolor = 'None', linewidth = 0.6, ax = ax)
 rivers.plot(ax = ax, linewidth = 0.5)
-afr_cities.plot(column = 'min_dist_to_rivers', markersize = 0.9, ax = ax)
+afr_cities.plot(column = 'min_dist_to_rivers', markersize = 0.9, ax = ax, legend = True)
 ax.set_ylim(-35, 50)
 ax.set_xlim(-20, 55)
 ax.set_title('Cities by shortest distance to Rivers')
@@ -247,21 +239,6 @@ ax.set_title('GAEZ Crop Suitability Measures')
 ax.set_axis_off()
 
 # %% [markdown] Collapsed="false"
-# ## Clipping Raster 
-
-# %% Collapsed="false"
-brazil = countries.query('ADMIN == "Brazil"')
-
-# %% Collapsed="false"
-grow_clip = grow.clip(brazil)[0]
-
-# %% Collapsed="false"
-f, ax = plt.subplots(1, figsize=(13, 11))
-grow_clip.plot(ax = ax, cmap = 'YlGn_r')
-ax.set_title('GAEZ Crop Suitability Measures')
-ax.set_axis_off()
-
-# %% [markdown] Collapsed="false"
 # ## Zonal Statistics 
 
 # %% Collapsed="false"
@@ -285,7 +262,7 @@ ax.set_title('Crop Suitability by Homeland \n Murdock Atlas', fontsize = 12)
 # ## Weight Matrices
 
 # %% Collapsed="false"
-%time w = lps.weights.Queen.from_dataframe(murdock_cs)
+# %time w = Queen.from_dataframe(murdock_cs)
 
 # %% Collapsed="false"
 w.n
@@ -298,57 +275,5 @@ murdock_cs.loc[w.islands, :].plot(color='red', ax=ax);
 # %% Collapsed="false"
 mur = murdock_cs.drop(w.islands)
 
-# %% Collapsed="false"
-%time w = lps.weights.Queen.from_dataframe(mur)
+# %% Collapsed="false" tags=[]
 w.transform = 'r'
-
-# %% [markdown] Collapsed="false"
-# ### Moran's I
-
-# %% [markdown] Collapsed="false"
-# Measure of spatial correlation
-#
-# $$I = \frac{N}{W} \frac{\sum_i \sum_j w_{ij} (x_i - \bar{x} ) ( x_j - \bar{x} ) }{ \sum_i (x_i - \bar{x})^2 }$$
-#
-# where $N$ is the total number of units, $x$ is the variable of interest, $w_{ij}$ is the spatial weight between units $i$ and $j$, and $W$ is the sum of all weights $w_{ij}$
-#
-# $I \in [-1, 1]$. Under null of no spatial correlation, $E(I) = \frac{-1}{N-1} \rightarrow 0$ with large $N$. 
-
-# %% Collapsed="false"
-mur.shape
-
-# %% Collapsed="false"
-mi = esda.moran.Moran(mur['mean'], w)
-mi.I
-mi.p_sim
-
-# %% [markdown] Collapsed="false"
-# ## Spatial Lag
-
-# %% Collapsed="false"
-mur['cs'] = (mur['mean'] - mur['mean'].mean()) / mur['mean'].std()
-
-# %% Collapsed="false"
-mur['lag_cs'] = lps.weights.lag_spatial(w, mur['cs'])
-
-# %% Collapsed="false"
-f, ax = plt.subplots(1, figsize=(9, 9))
-# Plot values
-sns.regplot(x='cs', y='lag_cs', data=mur, ci=None)
-# Add vertical and horizontal lines
-plt.axvline(0, c='k', alpha=0.5)
-plt.axhline(0, c='k', alpha=0.5)
-plt.text(1.75, 0.5, "HH", fontsize=25)
-plt.text(1.5, -1.5, "HL", fontsize=25)
-plt.text(-1, 1, "LH", fontsize=25)
-plt.text(-1.0, -1.5, "LL", fontsize=25)
-# Display
-plt.show()
-
-# %% [markdown] Collapsed="false"
-# # More 
-
-# %% [markdown] Collapsed="false"
-# + Local Indicators of Spatial Autocorrelation (spatial clustering)
-# + Conley SEs
-# + Gaussian Random Fields
